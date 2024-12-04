@@ -1,0 +1,124 @@
+import matplotlib
+import matplotlib.pyplot as plt
+from matplotlib import colors, cm
+from matplotlib.axes import Axes
+from matplotlib.font_manager import fontManager, FontProperties
+import numpy as np
+import os
+
+font = {'family': 'normal', 'weight': 'bold', 'size': 20}
+matplotlib.rc('font', **font)
+
+matplotlib.rcParams['text.usetex'] = True
+import matplotlib as mpl
+mpl.rcParams.update(mpl.rcParamsDefault)
+
+L = 100
+Density = 10000
+Alpha = 10.0
+q = 5
+
+M = Density*L
+x = np.arange(L)
+
+v = 10
+alpha_tilde = 1
+D_tilde = 1
+kon_tilde = 1
+koff_tilde = 1
+ 
+Ks = [1,10,100,np.inf]
+Nbs = [1,2,10]
+Densities = [10] #,100,1000]
+
+Min_rms = np.inf
+Max_rms = 0
+
+for ind_dens,Density in enumerate(Densities):
+ data = np.zeros([len(Ks),len(Nbs)])
+ for ind_K,K in enumerate(Ks):
+  for ind_Nb,Nb in enumerate(Nbs):
+   ns = np.arange(1,Nb+1)   
+   Lengths = []
+   dirU = main_dir+"U_L_"+str(L)+"_factor_"+str(Density)+"_alpha_10.0_Nb_"+str(Nb)+"_K_"+str(K)+".txt"
+   dataU = np.loadtxt(dirU) 
+   Lengths.append(len(dataU))
+   for i in ns:
+    Dir = main_dir+"C"+str(i)+"_L_"+str(L)+"_factor_"+str(Density)+"_alpha_10.0_Nb_"+str(Nb)+"_K_"+str(K)+".txt"
+    Lengths.append(len(np.loadtxt(Dir)))
+   Min = min(Lengths) - 1
+
+   Mx = np.zeros(L)
+   Mx += dataU[Min]
+
+   for i in ns:
+    Dir = main_dir+"C"+str(i)+"_L_"+str(L)+"_factor_"+str(Density)+"_alpha_10.0_Nb_"+str(Nb)+"_K_"+str(K)+".txt"
+    Data = np.loadtxt(Dir)
+    Mx += i*Data[Min] 
+
+   Mx = Mx/np.sum(Mx)
+    
+   y = np.log(Mx)
+   coefficients = np.polyfit(x,y, 1)
+   y_fit = np.polyval(coefficients, x)
+   rms_error = np.sqrt(np.mean((y - y_fit)**2))
+   data[ind_K,ind_Nb] = rms_error
+   Min_rms = rms_error if rms_error < Min_rms else Min_rms
+   Max_rms = rms_error if rms_error > Max_rms else Max_rms
+
+fig, axes = plt.subplots(1, len(Densities), figsize=(8,5*len(Densities)))
+
+for ind_dens,Density in enumerate(Densities):
+ data = np.zeros([len(Ks),len(Nbs)])
+ for ind_K,K in enumerate(Ks):
+  for ind_Nb,Nb in enumerate(Nbs): 
+   ns = np.arange(1,Nb+1) 
+   # First determining the minimum number of lines in the .txt files.
+   Lengths = []
+   dirU = main_dir+"U_L_"+str(L)+"_factor_"+str(Density)+"_alpha_10.0_Nb_"+str(Nb)+"_K_"+str(K)+".txt"
+   dataU = np.loadtxt(dirU) 
+   Lengths.append(len(dataU))
+   for i in ns:
+    Dir = main_dir+"C"+str(i)+"_L_"+str(L)+"_factor_"+str(Density)+"_alpha_10.0_Nb_"+str(Nb)+"_K_"+str(K)+".txt"
+    Lengths.append(len(np.loadtxt(Dir))) 
+   Min = min(Lengths) - 1
+   # Now determining the motor density along the microtuble at each site.
+   Mx = np.zeros(L)
+   Mx += dataU[Min]
+   for i in ns:
+    Dir = main_dir+"C"+str(i)+"_L_"+str(L)+"_factor_"+str(Density)+"_alpha_10.0_Nb_"+str(Nb)+"_K_"+str(K)+".txt"
+    Data = np.loadtxt(Dir)
+    Mx += i*Data[Min] 
+   #**********************************************************************************
+   # Normalizing the distribution based on the total number of motors in the system. *
+   # and taking the log of the data to compare against a linear distribtuion.        *
+   #**********************************************************************************
+   y = np.log(Mx/np.sum(Mx))
+   coefficients = np.polyfit(x,y, 1)
+   y_fit = np.polyval(coefficients, x)
+   #*******************************************************
+   # Computing the rms for the given Nb and K and setting *
+   # it to the appropriate index of the matrix data.      *
+   #*******************************************************
+   rms_error = np.sqrt(np.mean((y - y_fit)**2))
+   data[ind_K,ind_Nb] = rms_error
+ ax = axes[ind_dens]
+ ax.imshow(data, cmap=cmap, norm=norm)
+ #***************************************************************************
+ # The following is just formatting plot a grid distribution of the values. *
+ #***************************************************************************
+ ax.set_xticks(np.arange(-0.5, data.shape[1], 1), minor=True)
+ ax.set_yticks(np.arange(-0.5, data.shape[0], 1), minor=True)
+ ax.grid(which='minor', color='k', linestyle='-', linewidth=2)
+ ax.tick_params(which='both', bottom=False, left=False)
+
+ ax.set_xticks(np.arange(data.shape[1]))
+ ax.set_yticks(np.arange(data.shape[0]))
+ ax.set_yticklabels([r"$1$", r"$10$", r"$100$", r"$\infty$"])
+ ax.set_xticklabels([r"$%d$" % nb for nb in Nbs])
+ ax.invert_yaxis()
+ 
+ ax.set_ylabel("K")
+ ax.set_xlabel("Nb")
+
+plt.show()
